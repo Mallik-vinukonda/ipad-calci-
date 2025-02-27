@@ -1,6 +1,6 @@
 import { ColorSwatch, Group } from "@mantine/core";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, createRef } from "react";
 import axios from "axios";
 import Draggable from "react-draggable";
 import { SWATCHES } from "@/constants";
@@ -23,7 +23,9 @@ interface LatexItem {
 
 export default function Home() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
-	const draggableRefs = useRef<(HTMLDivElement | null)[]>([]);
+	const [draggableRefs, setDraggableRefs] = useState<
+		React.RefObject<HTMLDivElement>[]
+	>([]);
 	const [isDrawing, setIsDrawing] = useState(false);
 	const [color, setColor] = useState("rgb(255, 255, 255)");
 	const [reset, setReset] = useState(false);
@@ -31,6 +33,18 @@ export default function Home() {
 	const [result, setResult] = useState<GeneratedResult>();
 	const [latexPosition, setLatexPosition] = useState({ x: 10, y: 200 });
 	const [latexExpressions, setLatexExpressions] = useState<LatexItem[]>([]);
+
+	// Update draggableRefs when latexExpressions changes
+	useEffect(() => {
+		// Create refs for new expressions if needed
+		if (latexExpressions.length > draggableRefs.length) {
+			const newRefs = [...draggableRefs];
+			for (let i = draggableRefs.length; i < latexExpressions.length; i++) {
+				newRefs.push(createRef<HTMLDivElement>());
+			}
+			setDraggableRefs(newRefs);
+		}
+	}, [latexExpressions, draggableRefs]);
 
 	const renderLatexToCanvas = useCallback(
 		(expression: string, answer: string) => {
@@ -255,35 +269,29 @@ export default function Home() {
 				onMouseOut={stopDrawing}
 			/>
 
-			{latexExpressions.map((item, index) => {
-				if (!draggableRefs.current[index]) {
-					draggableRefs.current[index] = null;
-				}
-
-				return (
-					<Draggable
-						key={index}
-						nodeRef={draggableRefs.current[index]}
-						position={item.position}
-						onStop={(e, data) => {
-							setLatexExpressions((prev) =>
-								prev.map((expr, i) =>
-									i === index
-										? { ...expr, position: { x: data.x, y: data.y } }
-										: expr
-								)
-							);
-						}}
+			{latexExpressions.map((item, index) => (
+				<Draggable
+					key={index}
+					nodeRef={draggableRefs[index]}
+					position={item.position}
+					onStop={(e, data) => {
+						setLatexExpressions((prev) =>
+							prev.map((expr, i) =>
+								i === index
+									? { ...expr, position: { x: data.x, y: data.y } }
+									: expr
+							)
+						);
+					}}
+				>
+					<div
+						ref={draggableRefs[index]}
+						className="absolute p-2 text-white rounded shadow-md"
 					>
-						<div
-							ref={(el) => (draggableRefs.current[index] = el)}
-							className="absolute p-2 text-white rounded shadow-md"
-						>
-							<div className="latex-content">{item.content}</div>
-						</div>
-					</Draggable>
-				);
-			})}
+						<div className="latex-content">{item.content}</div>
+					</div>
+				</Draggable>
+			))}
 		</>
 	);
 }
